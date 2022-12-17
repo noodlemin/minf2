@@ -6,8 +6,10 @@ import numpy as np
 preprocessing
 '''
 # csv to dataframe
-before_df  = pd.read_csv('before.csv')
-after_df  = pd.read_csv('after.csv')
+before = 'before.csv'
+after = 'after.csv'
+before_df  = pd.read_csv(before)
+after_df  = pd.read_csv(after)
 # save 8 column names
 col_names = list(before_df.columns.values)[2:10]
 # regular expression to remove brackets and comma
@@ -29,18 +31,26 @@ for i in col_names:
 # check whether two dataframes are equal
 # print(before_df['image_id'].equals(after_df['image_id']))
 
+# create the dataframe
+
 '''
 Euclidean Distance
 '''
-dist = []
-a = after_df['head']
-b = before_df['head']
-# point1 = np.array((1, 2, 3))
-# print(a[0]-a[1])
-# print(type(before_df['head'][0]))
-# dist = np.linalg.norm(a - b)
-# print(dist)
-for i in range(len(a)):
-    dist.append(np.linalg.norm(a[i] - b[i]))
-# print(dist)
-print(np.max(dist))
+def euclidean_distance():
+    idx = ['Keypoint','Mean', 'Max', 'Min', 'STD']
+    # for each key point
+    rows = []
+    for i in col_names:
+        # get norm value of a-b
+        a = after_df[i]
+        b = before_df[i]
+        ab = np.vstack(a-b)
+        abn = np.linalg.norm(ab, axis=1)
+         
+        # calculate mean, max, min, STD and add to the dataframe
+        rows.append({'Keypoint': i,'Mean':np.mean(abn), 'Max': np.max(abn),'Min': np.min(abn), 'STD': np.std(abn)})
+    df = pd.DataFrame(data=rows ,columns=idx)
+    return df
+
+print(euclidean_distance())
+
