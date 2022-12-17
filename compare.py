@@ -37,7 +37,7 @@ for i in col_names:
 Euclidean Distance
 '''
 def euclidean_distance():
-    idx = ['Keypoint','Mean', 'Max', 'Min', 'STD']
+    idx = ['Keypoint','Median','Mean', 'Max', 'Min', 'STD']
     # for each key point
     rows = []
     for i in col_names:
@@ -48,9 +48,11 @@ def euclidean_distance():
         abn = np.linalg.norm(ab, axis=1)
          
         # calculate mean, max, min, STD and add to the dataframe
-        rows.append({'Keypoint': i,'Mean':np.mean(abn), 'Max': np.max(abn),'Min': np.min(abn), 'STD': np.std(abn)})
+        rows.append({'Keypoint': i, 'Median':np.around(np.median(abn), 3),'Mean':np.around(np.mean(abn), decimals=3), 'Max': np.around(np.max(abn), decimals=3),'Min': np.around(np.min(abn), decimals=3), 'STD': np.around(np.std(abn), decimals=3)})
+        print(i, 'max frame:', np.around((np.argmax(abn)/900)), np.argmax(abn)%900/15)
     df = pd.DataFrame(data=rows ,columns=idx)
     return df
 
 print(euclidean_distance())
+# euclidean_distance().to_csv('euclidean_distance.csv')
 
