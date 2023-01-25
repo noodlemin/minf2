@@ -227,6 +227,7 @@ def save_preds(path, valid_kpts, id = 0):
     project_name = path.split('/')[-1]
 
     pose_result = [valid_kpts[id][0]['keypoints']]
+    # print(pose_result)
     image_id = valid_kpts[id][0]['image_id']
 
     filename = str(image_id).zfill(10)
@@ -262,7 +263,7 @@ def generate_preds(path, valid_kpts):
     for i in range(len(valid_kpts)):
         save_preds(path,valid_kpts, id = i)
 
-path = '/Users/minseongkim/minf2/20210923_161107'
+path = '/home/tkfpsk/minf2/output/fake_pose/20220812_124345'
 
 project_name = path.split('/')[-1]
 algos = 'bottomup'
@@ -275,32 +276,35 @@ outputs = json.load(open(f'{path}/out_{project_name}_HigherHRNet.json'))
 
 if algos == 'bottomup':
     for output in outputs:
-        preds.append(output['preds'])
-        scores.append(output['scores'])
-        image_paths.append(output['image_paths'][0])
+        # print(output)
+        preds.append(output[0]['keypoints'])
+        scores.append(output[0]['score'])
+    #     image_paths.append(output['image_paths'][0])
 
     kpts = defaultdict(list)
     # id2name, name2id = _get_mapping_id_name(coco.imgs)
     # iterate over images
+    
     for idx, _preds in enumerate(preds):
-        str_image_path = image_paths[idx]
+        # str_image_path = image_paths[idx]
         # image_id = self.name2id[os.path.basename(str_image_path)]
-        image_id = int(os.path.basename(str_image_path).split('.')[0])
+        # image_id = int(os.path.basename(str_image_path).split('.')[0])
         # iterate over people
-        for idx_person, kpt in enumerate(_preds):
-            # use bbox area
-            kpt = np.array(kpt)
-            area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
+       
+        # use bbox area
+        kpt = np.array(_preds)
+        
+        area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
                 np.max(kpt[:, 1]) - np.min(kpt[:, 1]))
-
-            kpts[image_id].append({
-                'keypoints': kpt[:, 0:3],
-                'score': scores[idx][idx_person],
-                'tags': kpt[:, 3],
-                'image_id': image_id,
-                'area': area,
-            })
-
+        
+        kpts[idx].append({
+            'keypoints': kpt[:, :3],
+            'score': scores[idx],
+            'tags': kpt[:, :3],
+            'image_id': idx,
+            'area': area,
+        })
+        
     valid_kpts = []
     for img in kpts.keys():
         img_kpts = kpts[img]
