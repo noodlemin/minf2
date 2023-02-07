@@ -5,6 +5,7 @@ import pdb
 import cv2
 import os, csv
 import datetime
+from os import listdir
 
 preds = []
 scores = []
@@ -255,7 +256,10 @@ def save_preds(path, valid_kpts, id = 0):
 def generate_preds(path, valid_kpts):
     rgb = os.path.join(path,'rgb')
     project_name = path.split('/')[-1]
+    # print(path)
+    # print(project_name)
 
+    # with open(f'{path}/{project_name}_preds_HigherHRNet.csv','a', newline="") as p:
     with open(f'{path}/{project_name}_preds_HigherHRNet.csv','a', newline="") as p:
             row = ['path','imgName','head','Mid-Shoulder','Right-Shoulder','Right-Elbow','Right-Wrist','Left-shoulder','Left-Elbow','Left-Wrist','image_id','date','time','Action']
             csv_out=csv.writer(p)
@@ -263,123 +267,145 @@ def generate_preds(path, valid_kpts):
     for i in range(len(valid_kpts)):
         save_preds(path,valid_kpts, id = i)
 
-path = '/home/tkfpsk/minf2/output/fake_pose/20220812_124345'
 
-project_name = path.split('/')[-1]
-algos = 'bottomup'
-use_nms = 1
-outputs = json.load(open(f'{path}/out_{project_name}_HigherHRNet.json'))
 
-# algos = 'bottomsup'
-# use_nms = 1
-# outputs = json.load(open('out.json'))
+# path = '/mnt/c/Users/tkfps/Downloads/2d_poses/'
+path = '/mnt/c/Users/tkfps/Downloads/2dposes/'
+filelist = listdir(path)
 
-if algos == 'bottomup':
-    for output in outputs:
-        # print(output)
-        preds.append(output[0]['keypoints'])
-        scores.append(output[0]['score'])
-    #     image_paths.append(output['image_paths'][0])
-
-    kpts = defaultdict(list)
-    # id2name, name2id = _get_mapping_id_name(coco.imgs)
-    # iterate over images
-    
-    for idx, _preds in enumerate(preds):
-        # str_image_path = image_paths[idx]
-        # image_id = self.name2id[os.path.basename(str_image_path)]
-        # image_id = int(os.path.basename(str_image_path).split('.')[0])
-        # iterate over people
-       
-        # use bbox area
-        kpt = np.array(_preds)
+# o = json.load(open(f'{path}/{filelist[1]}'))
+# print(o[24])
+# p = json.load(open('/mnt/d/dataset/20210523_202300/'+ filelist[1]))
+# print(p[24])
+# exit()
+total_count = 0
+for i in filelist:
+    preds = []
+    scores = []
+    image_paths = []
+    # project_name = path.split('/')[-1]
+    project_name = i.split('_')[1] + '_' + i.split('_')[2]
+    outpath = '/mnt/c/Users/tkfps/Downloads/2dpost/' + project_name
+    # + project_name 
+    # os.mkdir(outpath)
+    # print(outpath)
+    algos = 'bottomup'
+    use_nms = 1
+    # outputs = json.load(open(f'{outpath}/out_{project_name}_HigherHRNet.json'))
+    output = json.load(open(f'{path}/{i}'))
+    # print(output[0])
+    # algos = 'bottomsup'
+    # use_nms = 1
+    # outputs = json.load(open('out.json'))
+    print(i)
+    if algos == 'bottomup':
+        for j, out in enumerate(output):
+            # print(out)
+            preds.append(out[0]['keypoints'])
+            scores.append(out[0]['score'])
+            image_paths.append(str(j).zfill(10))
+            # break
+            kpts = defaultdict(list)
+            # id2name, name2id = _get_mapping_id_name(coco.imgs)
+            # iterate over images
+            for idx, _preds in enumerate(preds):
+                # str_image_path = image_paths[idx]
+                # image_id = self.name2id[os.path.basename(str_image_path)]
+                # image_id = int(os.path.basename(str_image_path).split('.')[0])
+                # iterate over people
+                if not _preds and preds[idx-1]:
+                    _preds = preds[idx-1]      
+                elif not _preds and preds[idx+1]:  
+                    _preds = preds[idx+1]
+                # use bbox area
+                kpt = np.array(_preds)
+                
+                area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
+                        np.max(kpt[:, 1]) - np.min(kpt[:, 1]))
+                
+                kpts[idx].append({
+                    'keypoints': kpt[:, :3],
+                    'score': scores[idx],
+                    'tags': kpt[:, :3],
+                    'image_id': idx,
+                    'area': area,
+                })
+                
+            valid_kpts = []
+            for img in kpts.keys():
+                img_kpts = kpts[img]
+                if use_nms:
+                    nms = soft_oks_nms
+                    keep = nms(img_kpts, 0.9, sigmas = np.array([
+                        .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
+                        .87, .87, .89, .89
+                    ]) / 10.0)
+                    valid_kpts.append([img_kpts[_keep] for _keep in keep])
+                else:
+                    valid_kpts.append(img_kpts)
         
-        area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
-                np.max(kpt[:, 1]) - np.min(kpt[:, 1]))
-        
-        kpts[idx].append({
-            'keypoints': kpt[:, :3],
-            'score': scores[idx],
-            'tags': kpt[:, :3],
-            'image_id': idx,
-            'area': area,
-        })
-        
-    valid_kpts = []
-    for img in kpts.keys():
-        img_kpts = kpts[img]
-        if use_nms:
-            nms = soft_oks_nms
-            keep = nms(img_kpts, 0.9, sigmas = np.array([
-                .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
-                .87, .87, .89, .89
-            ]) / 10.0)
-            valid_kpts.append([img_kpts[_keep] for _keep in keep])
-        else:
-            valid_kpts.append(img_kpts)
+    elif algos == 'topdown':
+        kpts = defaultdict(list)
+        for output in outputs:
+            preds = np.array(output['preds'])
+            boxes = output['boxes']
+            image_paths = output['image_paths']
+            bbox_ids = output['bbox_ids']
 
-elif algos == 'topdown':
-    kpts = defaultdict(list)
-    for output in outputs:
-        preds = np.array(output['preds'])
-        boxes = output['boxes']
-        image_paths = output['image_paths']
-        bbox_ids = output['bbox_ids']
+            batch_size = len(image_paths)
+            for i in range(batch_size):
+                image_id = int(os.path.basename(image_paths[0]).split('.')[0])
+                kpts[image_id].append({
+                    'keypoints': preds[i],
+                    'center': boxes[i][0:2],
+                    'scale': boxes[i][2:4],
+                    'area': boxes[i][4],
+                    'score': boxes[i][5],
+                    'image_id': image_id,
+                    'bbox_id': bbox_ids[i]
+                })
+        kpts = _sort_and_unique_bboxes(kpts)
 
-        batch_size = len(image_paths)
-        for i in range(batch_size):
-            image_id = int(os.path.basename(image_paths[0]).split('.')[0])
-            kpts[image_id].append({
-                'keypoints': preds[i],
-                'center': boxes[i][0:2],
-                'scale': boxes[i][2:4],
-                'area': boxes[i][4],
-                'score': boxes[i][5],
-                'image_id': image_id,
-                'bbox_id': bbox_ids[i]
-            })
-    kpts = _sort_and_unique_bboxes(kpts)
+        # rescoring and oks nms
+        num_joints = 17
+        vis_thr = 0.2
+        valid_kpts = []
+        for image_id in kpts.keys():
+            img_kpts = kpts[image_id]
+            for n_p in img_kpts:
+                box_score = n_p['score']
+                kpt_score = 0
+                valid_num = 0
+                for n_jt in range(0, num_joints):
+                    t_s = n_p['keypoints'][n_jt][2]
+                    if t_s > vis_thr:
+                        kpt_score = kpt_score + t_s
+                        valid_num = valid_num + 1
+                if valid_num != 0:
+                    kpt_score = kpt_score / valid_num
+                # rescoring
+                n_p['score'] = kpt_score * box_score
 
-    # rescoring and oks nms
-    num_joints = 17
-    vis_thr = 0.2
-    valid_kpts = []
-    for image_id in kpts.keys():
-        img_kpts = kpts[image_id]
-        for n_p in img_kpts:
-            box_score = n_p['score']
-            kpt_score = 0
-            valid_num = 0
-            for n_jt in range(0, num_joints):
-                t_s = n_p['keypoints'][n_jt][2]
-                if t_s > vis_thr:
-                    kpt_score = kpt_score + t_s
-                    valid_num = valid_num + 1
-            if valid_num != 0:
-                kpt_score = kpt_score / valid_num
-            # rescoring
-            n_p['score'] = kpt_score * box_score
-
-        if use_nms:
-            nms = soft_oks_nms
-            keep = nms(img_kpts, 0.9, sigmas = np.array([
-                .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
-                .87, .87, .89, .89
-            ]) / 10.0)
-            valid_kpts.append([img_kpts[_keep] for _keep in keep])
-        else:
-            valid_kpts.append(img_kpts)
+            if use_nms:
+                nms = soft_oks_nms
+                keep = nms(img_kpts, 0.9, sigmas = np.array([
+                    .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
+                    .87, .87, .89, .89
+                ]) / 10.0)
+                valid_kpts.append([img_kpts[_keep] for _keep in keep])
+            else:
+                valid_kpts.append(img_kpts)
 
 
-palette = np.array([[255, 128, 0], [255, 153, 51], [255, 178, 102],
-                        [230, 230, 0], [255, 153, 255], [153, 204, 255],
-                        [255, 102, 255], [255, 51, 255], [102, 178, 255],
-                        [51, 153, 255], [255, 153, 153], [255, 102, 102],
-                        [255, 51, 51], [153, 255, 153], [102, 255, 102],
-                        [51, 255, 51], [0, 255, 0], [0, 0, 255], [255, 0, 0],
-                        [255, 255, 255]])
-
-generate_preds(path, valid_kpts)
+    palette = np.array([[255, 128, 0], [255, 153, 51], [255, 178, 102],
+                            [230, 230, 0], [255, 153, 255], [153, 204, 255],
+                            [255, 102, 255], [255, 51, 255], [102, 178, 255],
+                            [51, 153, 255], [255, 153, 153], [255, 102, 102],
+                            [255, 51, 51], [153, 255, 153], [102, 255, 102],
+                            [51, 255, 51], [0, 255, 0], [0, 0, 255], [255, 0, 0],
+                            [255, 255, 255]])
+# print('ahhhh:',total_count)
+    generate_preds(outpath, valid_kpts)
 
 # skeleton = [[16, 14], [14, 12], [17, 15], [15, 13], [12, 13], [6, 12],
 #                     [7, 13], [6, 7], [6, 8], [7, 9], [8, 10], [9, 11], [2, 3],

@@ -252,9 +252,5 @@ if __name__ == "__main__":
 
     b = '/mnt/c/Users/tkfps/Downloads/b/'
     a = '/mnt/c/Users/tkfps/Downloads/a/'
-    check_integrity(b, a)
-    
-    
-    # img_to_vid('/mnt/c/Users/tkfpsk/Downloads/20220812_124345/%010d.png', '/mnt/c/Users/tkfpsk/Downloads/output/20220812_124345.mp4')
-
-    # os.system("ffmpeg -r 30 -i /mnt/c/Users/tkfpsk/Downloads/20220812_124345/%010d.png -vcodec mpeg4 -y /mnt/c/Users/tkfpsk/Downloads/output/20220812_124345.mp4")
+    # check_integrity(b, a)
+    # get_frame(path, frame)
