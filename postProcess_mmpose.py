@@ -270,7 +270,7 @@ def generate_preds(path, valid_kpts):
 
 
 # path = '/mnt/c/Users/tkfps/Downloads/2d_poses/'
-path = '/mnt/c/Users/tkfps/Downloads/2dposes/'
+path = '/Users/min/minf2/2dpre'
 filelist = listdir(path)
 
 # o = json.load(open(f'{path}/{filelist[1]}'))
@@ -285,7 +285,7 @@ for i in filelist:
     image_paths = []
     # project_name = path.split('/')[-1]
     project_name = i.split('_')[1] + '_' + i.split('_')[2]
-    outpath = '/mnt/c/Users/tkfps/Downloads/2dpost/' + project_name
+    outpath = '/Users/min/minf2/2dout/' + project_name
     # + project_name 
     # os.mkdir(outpath)
     # print(outpath)
@@ -300,49 +300,58 @@ for i in filelist:
     print(i)
     if algos == 'bottomup':
         for j, out in enumerate(output):
+            empty = False
             # print(out)
-            preds.append(out[0]['keypoints'])
-            scores.append(out[0]['score'])
+            try:
+                preds.append(out[0]['keypoints'])
+                scores.append(out[0]['score'])
+            except:
+                empty = True
             image_paths.append(str(j).zfill(10))
             # break
             kpts = defaultdict(list)
             # id2name, name2id = _get_mapping_id_name(coco.imgs)
             # iterate over images
-            for idx, _preds in enumerate(preds):
-                # str_image_path = image_paths[idx]
-                # image_id = self.name2id[os.path.basename(str_image_path)]
-                # image_id = int(os.path.basename(str_image_path).split('.')[0])
-                # iterate over people
-                if not _preds and preds[idx-1]:
-                    _preds = preds[idx-1]      
-                elif not _preds and preds[idx+1]:  
-                    _preds = preds[idx+1]
-                # use bbox area
-                kpt = np.array(_preds)
-                
-                area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
-                        np.max(kpt[:, 1]) - np.min(kpt[:, 1]))
-                
-                kpts[idx].append({
-                    'keypoints': kpt[:, :3],
-                    'score': scores[idx],
-                    'tags': kpt[:, :3],
-                    'image_id': idx,
-                    'area': area,
-                })
-                
-            valid_kpts = []
-            for img in kpts.keys():
-                img_kpts = kpts[img]
-                if use_nms:
-                    nms = soft_oks_nms
-                    keep = nms(img_kpts, 0.9, sigmas = np.array([
-                        .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
-                        .87, .87, .89, .89
-                    ]) / 10.0)
-                    valid_kpts.append([img_kpts[_keep] for _keep in keep])
-                else:
-                    valid_kpts.append(img_kpts)
+            if empty:
+                continue
+            else:
+                for idx, _preds in enumerate(preds):
+                    # str_image_path = image_paths[idx]
+                    # image_id = self.name2id[os.path.basename(str_image_path)]
+                    # image_id = int(os.path.basename(str_image_path).split('.')[0])
+                    # iterate over people
+                    
+
+                    # if not _preds and preds[idx-1]:
+                    #     _preds = preds[idx-1]      
+                    # elif not _preds and preds[idx+1]:  
+                    #     _preds = preds[idx+1]
+                    # use bbox area
+                    kpt = np.array(_preds)
+                    
+                    area = (np.max(kpt[:, 0]) - np.min(kpt[:, 0])) * (
+                            np.max(kpt[:, 1]) - np.min(kpt[:, 1]))
+                    
+                    kpts[idx].append({
+                        'keypoints': kpt[:, :3],
+                        'score': scores[idx],
+                        'tags': kpt[:, :3],
+                        'image_id': idx,
+                        'area': area,
+                    })
+                    
+                valid_kpts = []
+                for img in kpts.keys():
+                    img_kpts = kpts[img]
+                    if use_nms:
+                        nms = soft_oks_nms
+                        keep = nms(img_kpts, 0.9, sigmas = np.array([
+                            .26, .25, .25, .35, .35, .79, .79, .72, .72, .62, .62, 1.07, 1.07,
+                            .87, .87, .89, .89
+                        ]) / 10.0)
+                        valid_kpts.append([img_kpts[_keep] for _keep in keep])
+                    else:
+                        valid_kpts.append(img_kpts)
         
     elif algos == 'topdown':
         kpts = defaultdict(list)
