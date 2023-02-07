@@ -287,7 +287,7 @@ for i in filelist:
     project_name = i.split('_')[1] + '_' + i.split('_')[2]
     outpath = '/Users/min/minf2/2dout/' + project_name
     # + project_name 
-    # os.mkdir(outpath)
+    os.mkdir(outpath)
     # print(outpath)
     algos = 'bottomup'
     use_nms = 1
@@ -300,6 +300,7 @@ for i in filelist:
     print(i)
     if algos == 'bottomup':
         for j, out in enumerate(output):
+            print(j)
             empty = False
             # print(out)
             try:
