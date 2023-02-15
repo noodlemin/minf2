@@ -11,6 +11,7 @@ import functools
 import operator
 import collections
 import tqdm
+import copy
 
 # 8 column names for all csv files
 col_names = ['head', 'Mid-Shoulder', 'Right-Shoulder', 'Right-Elbow', 'Right-Wrist', 'Left-shoulder', 'Left-Elbow', 'Left-Wrist']
@@ -174,20 +175,25 @@ def get_frame(path, frame):
     res, frame = cap.read()
     return frame
 
-def draw_lines(frame, coordinates, img_name):
+def draw_lines(frame, coordinates, img_name, color):
     '''
     draw a skeleton using keypoint pairs
     '''
+    if color == 'red':
+        rgb = (0, 0, 255)
+    elif color == 'green':
+        rgb = (0, 255, 0)
     for i in keypoint_pairs:
         point_j1 = np.asarray(coordinates[i[0]].astype(int))
         point_j2 = np.asarray(coordinates[i[1]].astype(int))
-        cv2.circle(frame, point_j1, 10, (0,255,0), -1)
-        cv2.circle(frame, point_j2, 10, (0,255,0), -1)
-        cv2.line(frame, point_j1, point_j2, (0,255,0), 3)
+        cv2.circle(frame, point_j1, 10, rgb, -1)
+        cv2.circle(frame, point_j2, 10, rgb, -1)
+        cv2.line(frame, point_j1, point_j2, rgb, 3)
         
     cv2.imwrite(img_name, frame)
 
-def euclidean_distance(data, before_dataframe, after_dataframe, type='2d'):
+exception_dataframe = pd.read_csv('/Users/min/minf2/data_15classNother_v5/df_all.csv')
+def euclidean_distance(data, before_dataframe, after_dataframe, project_name, type='2d'):
     '''
     Returns: 
         df: Euclidean distance dataframe 
@@ -209,9 +215,25 @@ def euclidean_distance(data, before_dataframe, after_dataframe, type='2d'):
             # max frame
             # m = before_dataframe['id'][np.argmax(abn)]
             abn = data[i]
-            m = np.argmax(abn)            
+            # want to maintain original indices, so store originl in the dictionary
+            temp_dict = {}
+            for j, dist in enumerate(abn):
+                temp_dict[dist] = j
+            # m = np.argmax(abn)
+
+            # remove 'other' action frames
             
-            # gather x, y coordinates of the frame
+            # try:
+            #     abn = np.delete(abn, ex_list)
+            # except:
+                
+            m = temp_dict.get(np.max(abn))
+
+            
+
+            
+
+            # gather x, y coordinates of the maximum distance frame
             raw_rows.append({'Keypoint': i, 'Frame': m, 'Distance': np.around(np.max(abn), 3),'x before': np.around(b.iloc[m][0], 3), 'x after': np.around(a.iloc[m][0], 3), 'y before': np.around(b.iloc[m][1], 3), 'y after': np.around(a.iloc[m][1], 3)})
 
             # calculate mean, max, min, STD and add to the dataframe
@@ -219,6 +241,7 @@ def euclidean_distance(data, before_dataframe, after_dataframe, type='2d'):
             # print(i, 'max frame:', np.around((np.argmax(abn)/900)), np.argmax(abn)%900/15)
         df = pd.DataFrame(data=rows ,columns=idx)
         raw_df = pd.DataFrame(data=raw_rows ,columns=raw_idx)
+        print(raw_df)
         return df, raw_df
 
     elif (type == '3d'):
@@ -226,7 +249,7 @@ def euclidean_distance(data, before_dataframe, after_dataframe, type='2d'):
     else:
         print('wrong type')
 
-def prepro_data(before_path, after_path):
+def prepro_data(before_path, after_path, fps, project_name):
     # keypoints dictionaries
     freq_dict = []
     # Euclidean distance dictionary
@@ -240,6 +263,8 @@ def prepro_data(before_path, after_path):
     # print(before_dataframe.head())
     # print(after_dataframe.head())
     # for each key point
+
+    # project_name = 
     for i in col_names:
         # get norm value of a-b
         # b = before_dataframe[[i, 'id']]
@@ -247,12 +272,24 @@ def prepro_data(before_path, after_path):
         a = after_dataframe[i]
         b = before_dataframe[i]
         ab = np.vstack(a-b)
-        abn = np.linalg.norm(ab, axis=1)
-        
-        # m = np.argmax(abn)
-        # ed_temp = dict.fromkeys(col_names, [])
-        
-        ed_dict[i] = abn
+        temp_eds = np.linalg.norm(ab, axis=1)
+        ex_list = exception_list(project_name)
+        eds = []
+        if fps == 30:
+            for j, val in enumerate(temp_eds):
+                if j%2 == 0:
+                    eds.append(val)
+            new_ex_list = np.divide(ex_list, 2).astype(int)
+            try:
+                eds = np.delete(eds, new_ex_list)
+            except:
+                print(new_ex_list[0])
+                # print(ex_list[0])
+                exit()
+            ed_dict[i] = eds
+        else:
+            eds = np.delete(temp_eds, ex_list)
+            ed_dict[i] = eds
         # print(i, len(ed_dict[i]))
 
         # sort by image_id
@@ -262,7 +299,7 @@ def prepro_data(before_path, after_path):
         # dist = (merged_df[i+'_x'] - merged_df[i+'_y']).tolist()
         # print(dist)
         # dist = np.round(np.linalg.norm(dist, axis=1), 0).astype(int)
-        dist = np.round(abn, 0).astype(int)
+        dist = np.round(eds, 0).astype(int)
         temp = {}
         for j in dist:
             if j in temp:
@@ -275,73 +312,90 @@ def prepro_data(before_path, after_path):
         # key_dict[i].append(dist)
     return freq_dict, ed_dict
 
-def max_ed_images(after_dataframe, after_video_path, before_dataframe, before_video_path, raw_dataframe):
+def max_ed_images(after_dataframe, after_video_path, before_dataframe, raw_dataframe, outpath):
     for idx in raw_dataframe.index:
         frame = raw_dataframe['Frame'][idx]
         image = get_frame(after_video_path, raw_dataframe['Frame'][idx])
-        name = 'output/'+raw_dataframe['Keypoint'][idx] + '.png'
-        draw_lines(image, after_dataframe.iloc[frame], name)
-        bname = 'output/'+raw_dataframe['Keypoint'][idx] + '_b.png'
-        bimage = get_frame(before_video_path, raw_dataframe['Frame'][idx])
-        draw_lines(bimage, before_dataframe.iloc[frame], bname)
+        name = 'output/'+ outpath + raw_dataframe['Keypoint'][idx] + '.png'
+        draw_lines(image, before_dataframe.iloc[frame], name, 'green')
+        draw_lines(image, after_dataframe.iloc[frame], name, 'red')
+        # bname = 'output/'+raw_dataframe['Keypoint'][idx] + '_b.png'
+        # bimage = get_frame(after_video_path, raw_dataframe['Frame'][idx])
+
+
+# remove frames at the beginning or the end of the video
+label_path = '/Users/min/minf2/data_15classNother_v5/'
+split_list = ['sp1.csv', 'sp2.csv', 'sp3.csv', 'sp4.csv', 'sp5.csv']
+# action 0: other
+ignore_action_list = [0]
+required_columns = ['Project', 'Imgs', 'Action', 'fps']
+after_dir = listdir('/Users/min/minf2/2dout/')
+after_dir.remove('.DS_Store')
+
+def exceptions():
+    dfs = []
+    print('processing CSVs')
+    for i in tqdm.tqdm(split_list):
+        temp_df = pd.read_csv(label_path+i)
+        # print(temp_df['Action'].dtypes)
+        # break
+        df = temp_df[required_columns]
+        df = df[df['Project'].isin(after_dir)]
+        df = df[df['Action'].isin(ignore_action_list)]
+        dfs.append(df)
+    concated_df = pd.concat(dfs, axis=0)
+    concated_df.to_csv(label_path+'df_all.csv')
+
+# 
+def exception_list(project_name):
+    # print(exception_dataframe.shape)
+    df = exception_dataframe[exception_dataframe['Project']==project_name]
+    # print(df.shape)
+    exception_list = df['Imgs'].tolist()
+    return exception_list
+
+
+
+
+
+
+    
 
 
 
 # raw_df.to_csv('raw_positions.csv')
 # euclidean_distance().to_csv('euclidean_distance.csv')
 
-if __name__ == "__main__":
-    # before = './output/pose/20220812_124345/20220812_124345_preds_HigherHRNet.csv'
-    # after = './output/fake_pose/20220812_124345/20220812_124345_preds_HigherHRNet.csv' 
-    # df_b = csv_to_df(before)
-    # df_a = csv_to_df(after)
-    # ed_df, raw_df = euclidean_distance(df_b, df_a)
+if __name__ == "__main__": 
 
-    # print(ed_df)
-    # print()
-    # print(raw_df)
-   
-    # for idx in raw_df.index:
-    #     frame = raw_df['Frame'][idx]
-    #     image = get_frame(a_path, raw_df['Frame'][idx])
-    #     name = 'output/'+raw_df['Keypoint'][idx] + '.png'
-    #     draw_lines(image, df_a.iloc[frame], name)
-    #     bname = 'output/'+raw_df['Keypoint'][idx] + '_b.png'
-    #     bimage = get_frame(a_path, raw_df['Frame'][idx])
-    #     draw_lines(bimage, df_b.iloc[frame], bname)
- 
     before_path = '/Users/min/minf2/2dori/'
     after_path = '/Users/min/minf2/2dout/'
     before_dir = listdir('/Users/min/minf2/2dori/')
     after_dir = listdir('/Users/min/minf2/2dout/')
-    # print(before_dir)
-    # print(after_dir)
-    # before_dir.remove(''.DS_Store')
     after_dir.remove('.DS_Store')
     image_path = '/Users/min/minf2/output/images/'
+    csv_path = '/Users/min/minf2/output/csvs/'
     freq_dicts = []
     ed_dicts = []
+    
+    # exceptions()
+
     print('Processing')
     for i in tqdm.tqdm(after_dir):
         if i == '.DS_Store':
             continue
+        temp_fps = exception_dataframe[exception_dataframe['Project']==i].iloc[0]
+        fps = temp_fps['fps']
+        print(i, fps)
         file_name = i + '_preds_HigherHRNet.csv'
-        # print(i)
-        # print(file_name)
-        freq_dict, ed_dict= prepro_data(before_path+file_name, after_path+i+'/'+file_name)
-        
+        freq_dict, ed_dict= prepro_data(before_path+file_name, after_path+i+'/'+file_name, fps, i)
         freq_dicts.append(freq_dict)
         ed_dicts.append(ed_dict)
-    print(len(ed_dicts[0]['head']))
+
     # sum frequencies and ED
     freq_sum = []
     ed_sum = []
-    # for i, project in enumerate(freq_dicts):
-    #     if i == 0:
-    #         temp = project
-    #     else:
-    #         for j, dict in enumerate(temp):
-    #             temp[j] = {k: project[j].get(k, 0) + dict.get(k, 0) for k in set(project[j]) | set(dict)}
+
     for i in range(len(freq_dicts)):
         freq_project = freq_dicts[i]
         ed_project = ed_dicts[i]
@@ -359,29 +413,47 @@ if __name__ == "__main__":
                     for key in ed:
                         temp_list = np.concatenate((ed_sum[key], ed[key]), axis=None)
                         ed_sum[key] = temp_list
-                        # print(len(ed_sum[key]))
+
+
+                
                         
             # for j, key in enumerate(ed_sum):
                 # ed_sum[j] = {k: ed_project[j].get(k, 0) + ed_sum[j].get(k, 0) for k in set(ed_project[j]) | set(ed_sum[j])}
+    
+    # get images and statistics
     for i, dict in enumerate(ed_dicts):
         file_name = after_dir[i] + '_preds_HigherHRNet.csv'
         before_dataframe = csv_to_df(before_path+file_name)
         after_dataframe = csv_to_df(after_path+after_dir[i]+'/'+file_name)
-        df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe)
-        if i == 9:
-            print(df)
-            print(raw_df)
-            
+        df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe, after_dir[i])
+        df.to_csv(csv_path+after_dir[i]+'.csv')
+        os.makedirs('/Users/min/minf2/output/' + after_dir[i])
+        for idx in raw_df.index:
+            vid_path = '/Users/min/Desktop/deepfaked_videos/' + after_dir[i] + '.mp4'
+            outpath = after_dir[i] + '/'
+            max_ed_images(after_dataframe, vid_path, before_dataframe, raw_df, outpath)
+
+
+            # frame = raw_df['Frame'][idx]
+            # image = get_frame(vid_path, raw_df['Frame'][idx])
+            # name = 'output/'+ after_dir[i] + '/'+ raw_df['Keypoint'][idx] + '.png'
+            # draw_lines(image, after_dataframe.iloc[frame], name)
+            # bname = 'output/'+ after_dir[i] + '/' + raw_df['Keypoint'][idx] + '_b.png'
+            # bimage = get_frame(vid_path, raw_df['Frame'][idx])
+            # draw_lines(bimage, before_dataframe.iloc[frame], bname)
+        
+    
+
     # draw histogram
-    # for n, i in enumerate(freq_sum):
-    #     plt.clf()
-    #     plt.bar(range(len(i)), list(i.values()), tick_label=list(i.keys()))
-    #     ax = plt.gca()
-    #     ax.set_xticks(ax.get_xticks()[::10])
-    #     plt.xlabel('Euclidean Distance (pixel)')
-    #     plt.ylabel('Frequency')
-    #     plt.title(col_names[n])
-    #     plt.savefig(image_path+col_names[n]+'.png')
+    for n, i in enumerate(freq_sum):
+        plt.clf()
+        plt.bar(range(len(i)), list(i.values()), tick_label=list(i.keys()))
+        ax = plt.gca()
+        ax.set_xticks(ax.get_xticks()[::10])
+        plt.xlabel('Euclidean Distance (pixel)')
+        plt.ylabel('Frequency')
+        plt.title(col_names[n])
+        plt.savefig(image_path+col_names[n]+'.png')
         
     
 
