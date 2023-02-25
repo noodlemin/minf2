@@ -184,8 +184,14 @@ def draw_lines(frame, coordinates, img_name, color):
     elif color == 'green':
         rgb = (0, 255, 0)
     for i in keypoint_pairs:
-        point_j1 = np.asarray(coordinates[i[0]].astype(int))
-        point_j2 = np.asarray(coordinates[i[1]].astype(int))
+        # print(i)
+        j1 = coordinates[i[0]].to_numpy()[0]
+        j2 = coordinates[i[1]].to_numpy()[0]
+        point_j1 = j1.astype(int)
+        point_j2 = j2.astype(int)
+        # vector = np.vectorize(np.int_)
+        # point_j1 = vector(j1)
+        # point_j2 = vector(j2)
         cv2.circle(frame, point_j1, 10, rgb, -1)
         cv2.circle(frame, point_j2, 10, rgb, -1)
         cv2.line(frame, point_j1, point_j2, rgb, 3)
@@ -193,61 +199,146 @@ def draw_lines(frame, coordinates, img_name, color):
     cv2.imwrite(img_name, frame)
 
 exception_dataframe = pd.read_csv('/Users/min/minf2/data_15classNother_v5/df_all.csv')
-def euclidean_distance(data, before_dataframe, after_dataframe, project_name, type='2d'):
-    '''
-    Returns: 
-        df: Euclidean distance dataframe 
-        raw_df: Frames and coordinates of keypoints where the Euclidean distance is maximum 
-    '''
-    idx = ['Keypoint','Median','Mean', 'Max', 'Min', 'STD']
+def euclidean_distance(data, before_dataframe, after_dataframe, project_name, fps, type='2d'):
+    """
+    Returns a dataframe with Euclidean distances between keypoints before and after a transformation.
+
+    Parameters:
+    data (dict): A dictionary containing Euclidean distances for each keypoint.
+    before_dataframe (pandas.DataFrame): A dataframe containing x and y coordinates of keypoints before the transformation.
+    after_dataframe (pandas.DataFrame): A dataframe containing x and y coordinates of keypoints after the transformation.
+    project_name (str): Name of the project.
+    fps (int): Frames per second.
+    type (str): Type of keypoints, either '2d' or '3d'. Default is '2d'.
+
+    Returns:
+    df (pandas.DataFrame): Euclidean distance dataframe.
+    raw_df (pandas.DataFrame): Frames and coordinates of keypoints where the Euclidean distance is maximum.
+    """
+
+    idx = ['Keypoint', 'Median', 'Mean', 'Max', 'Min', 'STD']
     raw_idx = ['Keypoint', 'Frame', 'Distance', 'x before', 'x after', 'y before', 'y after']
+
     # for each key point
     rows = []
     raw_rows = []
-    
+
     if type == '2d':
-        for i in col_names:
+        for keypoint in data.keys():
             # get norm value of a-b
-            a = after_dataframe[i]
-            b = before_dataframe[i]
-            # ab = np.vstack(a-b)
+            a = after_dataframe[keypoint]
+            b = before_dataframe[keypoint]
+            # ab = np.vstack(a - b)
             # abn = np.linalg.norm(ab, axis=1)
-            # max frame
-            # m = before_dataframe['id'][np.argmax(abn)]
-            abn = data[i]
-            # want to maintain original indices, so store originl in the dictionary
-            temp_dict = {}
-            for j, dist in enumerate(abn):
-                temp_dict[dist] = j
-            # m = np.argmax(abn)
-
-            # remove 'other' action frames
-            
-            # try:
-            #     abn = np.delete(abn, ex_list)
-            # except:
-                
-            m = temp_dict.get(np.max(abn))
-
-            
-
-            
+            abn = data[keypoint]
 
             # gather x, y coordinates of the maximum distance frame
-            raw_rows.append({'Keypoint': i, 'Frame': m, 'Distance': np.around(np.max(abn), 3),'x before': np.around(b.iloc[m][0], 3), 'x after': np.around(a.iloc[m][0], 3), 'y before': np.around(b.iloc[m][1], 3), 'y after': np.around(a.iloc[m][1], 3)})
+            max_frame_idx = max(abn, key=abn.get)
+
+            max_distance = np.around(abn[max_frame_idx], 3)
+            
+            x_before = np.around(b[max_frame_idx][0], 3)
+            x_after = np.around(a[max_frame_idx][0], 3)
+            y_before = np.around(b[max_frame_idx][1], 3)
+            y_after = np.around(a[max_frame_idx][1], 3)
+            raw_rows.append({'Keypoint': keypoint, 'Frame': max_frame_idx, 'Distance': max_distance,
+                              'x before': x_before, 'x after': x_after, 'y before': y_before, 'y after': y_after})
 
             # calculate mean, max, min, STD and add to the dataframe
-            rows.append({'Keypoint': i, 'Median': np.around(np.median(abn), 3),'Mean': np.around(np.mean(abn), decimals=3), 'Max': np.around(np.max(abn), decimals=3),'Min': np.around(np.min(abn), decimals=3), 'STD': np.around(np.std(abn), decimals=3)})
-            # print(i, 'max frame:', np.around((np.argmax(abn)/900)), np.argmax(abn)%900/15)
-        df = pd.DataFrame(data=rows ,columns=idx)
-        raw_df = pd.DataFrame(data=raw_rows ,columns=raw_idx)
+            dists_list = list(abn.values())
+            median_distance = np.around(np.median(dists_list), 3)
+            mean_distance = np.around(np.mean(dists_list), decimals=3)
+            # max_distance = np.around(np.max(data[keypoint]), decimals=3)
+            min_distance = np.around(np.min(dists_list), decimals=3)
+            std_distance = np.around(np.std(dists_list), decimals=3)
+            rows.append({'Keypoint': keypoint, 'Median': median_distance, 'Mean': mean_distance,
+                         'Max': max_distance, 'Min': min_distance, 'STD': std_distance})
+
+        df = pd.DataFrame(data=rows, columns=idx)
+        raw_df = pd.DataFrame(data=raw_rows, columns=raw_idx)
+        print(project_name)
         print(raw_df)
+        print()
         return df, raw_df
 
-    elif (type == '3d'):
+    elif type == '3d':
         return
     else:
-        print('wrong type')
+        print('Invalid keypoint type:', type)
+
+# def euclidean_distance(data, before_dataframe, after_dataframe, project_name, fps, type='2d'):
+#     '''
+#     Returns: 
+#         df: Euclidean distance dataframe 
+#         raw_df: Frames and coordinates of keypoints where the Euclidean distance is maximum 
+#     '''
+#     idx = ['Keypoint','Median','Mean', 'Max', 'Min', 'STD']
+#     raw_idx = ['Keypoint', 'Frame', 'Distance', 'x before', 'x after', 'y before', 'y after']
+#     # for each key point
+#     rows = []
+#     raw_rows = []
+    
+#     if type == '2d':
+#         for i in col_names:
+#             # get norm value of a-b
+#             a = after_dataframe[i]
+#             b = before_dataframe[i]
+            
+#             ab = np.vstack(a-b)
+#             # print(ab[0])
+#             abn = np.linalg.norm(ab, axis=1)
+#             # print(abn[0])
+#             # max frame
+#             # m = before_dataframe['id'][np.argmax(abn)]
+#             distances = data[i]
+#             print('data length: ', len(distances))
+#             # want to maintain original indices, so store originl in the dictionary
+#             temp_dict = {}
+#             for j, dist in enumerate(abn):
+#                 # print(dist)
+#                 temp_dict[dist] = j
+#             # m = np.argmax(abn)
+
+#             # remove 'other' action frames
+            
+#             # try:
+#             #     abn = np.delete(abn, ex_list)
+#             # except:
+#             # print('before: ', abn[10796])
+#             # print('x y:', a[10796])
+#             # print('x y:', b[10796])
+#             # print('true: ', np.max(distances))
+            
+#             # exit()
+
+#             m = temp_dict.get(np.max(distances))
+#             # print(len(exception_dataframe[exception_dataframe['Project']=='20211001_152746']))
+#             # print(len(a))
+#             # print('head b: ', b[10796])
+#             # print('head a: ', a[10796])
+#             # exit()
+
+
+            
+
+            
+
+#             # gather x, y coordinates of the maximum distance frame
+#             raw_rows.append({'Keypoint': i, 'Frame': m, 'Distance': np.around(np.max(distances), 3),'x before': np.around(b.iloc[m][0], 3), 'x after': np.around(a.iloc[m][0], 3), 'y before': np.around(b.iloc[m][1], 3), 'y after': np.around(a.iloc[m][1], 3)})
+
+#             # calculate mean, max, min, STD and add to the dataframe
+#             rows.append({'Keypoint': i, 'Median': np.around(np.median(distances), 3),'Mean': np.around(np.mean(distances), decimals=3), 'Max': np.around(np.max(distances), decimals=3),'Min': np.around(np.min(distances), decimals=3), 'STD': np.around(np.std(distances), decimals=3)})
+#             # print(i, 'max frame:', np.around((np.argmax(abn)/900)), np.argmax(abn)%900/15)
+#         df = pd.DataFrame(data=rows ,columns=idx)
+#         raw_df = pd.DataFrame(data=raw_rows ,columns=raw_idx)
+#         print(project_name)
+#         print(raw_df)
+#         return df, raw_df
+
+#     elif (type == '3d'):
+#         return
+#     else:
+#         print('wrong type')
 
 def prepro_data(before_path, after_path, fps, project_name):
     # keypoints dictionaries
@@ -257,6 +348,11 @@ def prepro_data(before_path, after_path, fps, project_name):
     
     before_dataframe = csv_to_df(before_path)
     after_dataframe = csv_to_df(after_path)
+    
+    # print(before_dataframe.head)
+    # print(after_dataframe.head)
+
+
     if before_dataframe.shape != after_dataframe.shape:
         print('the heck?')
     # pd.set_option('display.max_columns', None)
@@ -269,10 +365,60 @@ def prepro_data(before_path, after_path, fps, project_name):
         # get norm value of a-b
         # b = before_dataframe[[i, 'id']]
         # a = after_dataframe[[i, 'id']]
-        a = after_dataframe[i]
-        b = before_dataframe[i]
-        ab = np.vstack(a-b)
-        temp_eds = np.linalg.norm(ab, axis=1)
+        a = after_dataframe[['id', i]]
+        b = before_dataframe[['id', i]]
+        # print(a.iloc[0])
+        # print(b.iloc[0])
+        # exit()
+        # print(a.iloc[0]['head'] -b.iloc[0]['head'])
+        # print(a[i].head)
+        # print(b[i].head)
+        # print(np.subtract(a[i].to_numpy(), b[i].to_numpy()))
+        # print(a[i].sub(b[i]))
+        ab = np.subtract(a[i].to_numpy(), b[i].to_numpy())
+        # np.vstack(a[i]-b[i])
+        # print(ab[0])
+        # exi90t()
+        ab = ab.tolist()
+        temp_dists = np.linalg.norm(ab, axis=1)
+        # print(temp_dists[0])
+        # print( np.sqrt(np.square(ab[0][0]) + np.square(ab[0][1])) )
+        
+        temp_eds = []
+        for j, dist in enumerate(temp_dists):
+            temp = [j, dist]
+            temp_eds.append(temp)
+
+        ex_list = exception_list(project_name)
+        eds = []
+        if fps == 30:
+            for j in temp_eds:
+                if j[0]%2 == 0:
+                    eds.append(j)
+            new_ex_list = np.divide(ex_list, 2).astype(int)
+            try:
+
+                eds = np.delete(eds, new_ex_list, 0)
+            except:
+                print(new_ex_list[0])
+                # print(ex_list[0])
+                exit()
+            # ed_dict[i] = eds
+        else:
+            
+            # print(ex_list)
+            # eds = np.delete(temp_eds, ex_list)
+            eds = np.delete(temp_eds, ex_list, 0)
+        
+        eds_dict = {}
+        for j in eds:
+            idx = j[0].astype(int)
+            distance = j[1]
+            eds_dict[idx] = distance
+        
+
+        ed_dict[i] = eds_dict
+        '''
         ex_list = exception_list(project_name)
         eds = []
         if fps == 30:
@@ -290,6 +436,7 @@ def prepro_data(before_path, after_path, fps, project_name):
         else:
             eds = np.delete(temp_eds, ex_list)
             ed_dict[i] = eds
+        '''
         # print(i, len(ed_dict[i]))
 
         # sort by image_id
@@ -299,26 +446,38 @@ def prepro_data(before_path, after_path, fps, project_name):
         # dist = (merged_df[i+'_x'] - merged_df[i+'_y']).tolist()
         # print(dist)
         # dist = np.round(np.linalg.norm(dist, axis=1), 0).astype(int)
+        dist = []
         dist = np.round(eds, 0).astype(int)
+        # print(dist)
         temp = {}
         for j in dist:
-            if j in temp:
-                temp[j] += 1
+            
+            if j[1] in temp:
+                temp[j[1]] += 1
             else:
-                temp[j] = 1
+                temp[j[1]] = 1
         freq_dict.append(temp)
         # ed_dict.append(ed_temp)
 
         # key_dict[i].append(dist)
+
     return freq_dict, ed_dict
 
 def max_ed_images(after_dataframe, after_video_path, before_dataframe, raw_dataframe, outpath):
     for idx in raw_dataframe.index:
         frame = raw_dataframe['Frame'][idx]
-        image = get_frame(after_video_path, raw_dataframe['Frame'][idx])
+        image = get_frame(after_video_path, frame)
+                        #   raw_dataframe['Frame'][idx])
         name = 'output/'+ outpath + raw_dataframe['Keypoint'][idx] + '.png'
-        draw_lines(image, before_dataframe.iloc[frame], name, 'green')
-        draw_lines(image, after_dataframe.iloc[frame], name, 'red')
+        # print(frame)
+        # print(before_dataframe.iloc[frame])
+        # print(after_dataframe.iloc[frame])
+        # print(before_dataframe.loc[before_dataframe['id'] == frame])
+        # print(after_dataframe.loc[after_dataframe['id'] == frame])
+        # exit()
+        # print(before_dataframe[before_dataframe['id']==frame])
+        draw_lines(image, before_dataframe[before_dataframe['id']==frame], name, 'green')
+        draw_lines(image, after_dataframe[after_dataframe['id']==frame], name, 'red')
         # bname = 'output/'+raw_dataframe['Keypoint'][idx] + '_b.png'
         # bimage = get_frame(after_video_path, raw_dataframe['Frame'][idx])
 
@@ -379,14 +538,16 @@ if __name__ == "__main__":
     ed_dicts = []
     
     # exceptions()
+    fps_dict = {}
 
-    print('Processing')
+   
     for i in tqdm.tqdm(after_dir):
         if i == '.DS_Store':
             continue
         temp_fps = exception_dataframe[exception_dataframe['Project']==i].iloc[0]
         fps = temp_fps['fps']
         print(i, fps)
+        fps_dict[i] = fps
         file_name = i + '_preds_HigherHRNet.csv'
         freq_dict, ed_dict= prepro_data(before_path+file_name, after_path+i+'/'+file_name, fps, i)
         freq_dicts.append(freq_dict)
@@ -425,9 +586,11 @@ if __name__ == "__main__":
         file_name = after_dir[i] + '_preds_HigherHRNet.csv'
         before_dataframe = csv_to_df(before_path+file_name)
         after_dataframe = csv_to_df(after_path+after_dir[i]+'/'+file_name)
-        df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe, after_dir[i])
+        df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe, after_dir[i], fps_dict[after_dir[i]])
         df.to_csv(csv_path+after_dir[i]+'.csv')
-        os.makedirs('/Users/min/minf2/output/' + after_dir[i])
+        if not (os.path.exists('/Users/min/minf2/output/' + after_dir[i])):
+            os.makedirs('/Users/min/minf2/output/' + after_dir[i])
+
         for idx in raw_df.index:
             vid_path = '/Users/min/Desktop/deepfaked_videos/' + after_dir[i] + '.mp4'
             outpath = after_dir[i] + '/'
