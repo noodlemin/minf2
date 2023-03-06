@@ -9,7 +9,8 @@ from scipy.ndimage import gaussian_filter, sobel
 from scipy import stats
 from scipy.interpolate import CubicSpline, Rbf, interp2d
 from scipy.special import rel_entr, kl_div
-import pyrealsense2 as rs
+# import pyrealsense2 as rs
+from tqdm import tqdm 
 
 # from KalmanFilter import KalmanFilter, KalmanFilter1D
 # import statsmodels.api as sm
@@ -237,11 +238,18 @@ def getEverything(path, action_path, exportPath):
             #     pdb.set_trace()
             
         
-
-path = '/mnt/c/Users/tkfps/Downloads/dataset'
+path = '/Volumes/UNTITLED/dataset/'
+# path = '/mnt/c/Users/tkfps/Downloads/dataset'
 action_path = 'D:\PhD Edinburgh\RealSenseTests\EatSense/actionlabels'
-exportPath = '/mnt/c/Users/tkfps/Downloads/dataset/pose3d_before'
+# exportPath = '/mnt/c/Users/tkfps/Downloads/dataset/pose3d_before'
+exportPath = '/Users/min/minf2/3dori'
 # getActions(action_path, '20210523_202300')
-getPoses(path,'20211029_150526')
+dataset = os.listdir(path)
+
+for i in dataset:
+    if i.split()[-1][:-4] == '.zip':
+        print('lol')
+
+#     getPoses(path, i)
 
 # getEverything(path, exportPath)

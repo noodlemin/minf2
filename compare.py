@@ -540,87 +540,96 @@ if __name__ == "__main__":
     # exceptions()
     fps_dict = {}
 
-   
-    for i in tqdm.tqdm(after_dir):
-        if i == '.DS_Store':
-            continue
-        temp_fps = exception_dataframe[exception_dataframe['Project']==i].iloc[0]
-        fps = temp_fps['fps']
-        print(i, fps)
-        fps_dict[i] = fps
-        file_name = i + '_preds_HigherHRNet.csv'
-        freq_dict, ed_dict= prepro_data(before_path+file_name, after_path+i+'/'+file_name, fps, i)
-        freq_dicts.append(freq_dict)
-        ed_dicts.append(ed_dict)
+    def work():
+        for i in tqdm.tqdm(after_dir):
+            if i == '.DS_Store':
+                continue
+            temp_fps = exception_dataframe[exception_dataframe['Project']==i].iloc[0]
+            fps = temp_fps['fps']
+            print(i, fps)
+            fps_dict[i] = fps
+            file_name = i + '_preds_HigherHRNet.csv'
+            freq_dict, ed_dict= prepro_data(before_path+file_name, after_path+i+'/'+file_name, fps, i)
+            freq_dicts.append(freq_dict)
+            ed_dicts.append(ed_dict)
 
-    # sum frequencies and ED
-    freq_sum = []
-    ed_sum = []
-
-    for i in range(len(freq_dicts)):
-        freq_project = freq_dicts[i]
-        ed_project = ed_dicts[i]
-        if i == 0:
-            freq_sum = freq_project
-            ed_sum = ed_project
-        else:
-            for j in range(len(freq_sum)):
-                freq_sum[j] = {k: freq_project[j].get(k, 0) + freq_sum[j].get(k, 0) for k in set(freq_project[j]) | set(freq_sum[j])}
-            for j, ed in enumerate(ed_dicts):
-                if j == 0:
-                    ed_sum = ed.copy()
-                else:
-                    temp_list = []
-                    for key in ed:
-                        temp_list = np.concatenate((ed_sum[key], ed[key]), axis=None)
-                        ed_sum[key] = temp_list
-
-
-                
-                        
-            # for j, key in enumerate(ed_sum):
-                # ed_sum[j] = {k: ed_project[j].get(k, 0) + ed_sum[j].get(k, 0) for k in set(ed_project[j]) | set(ed_sum[j])}
-    
-    # get images and statistics
-    for i, dict in enumerate(ed_dicts):
-        file_name = after_dir[i] + '_preds_HigherHRNet.csv'
-        before_dataframe = csv_to_df(before_path+file_name)
-        after_dataframe = csv_to_df(after_path+after_dir[i]+'/'+file_name)
-        df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe, after_dir[i], fps_dict[after_dir[i]])
-        df.to_csv(csv_path+after_dir[i]+'.csv')
-        if not (os.path.exists('/Users/min/minf2/output/' + after_dir[i])):
-            os.makedirs('/Users/min/minf2/output/' + after_dir[i])
-
-        for idx in raw_df.index:
-            vid_path = '/Users/min/Desktop/deepfaked_videos/' + after_dir[i] + '.mp4'
-            outpath = after_dir[i] + '/'
-            max_ed_images(after_dataframe, vid_path, before_dataframe, raw_df, outpath)
+        # sum frequencies and ED
+        freq_sum = []
+        ed_sum = []
+        
+        
+        for i in range(len(freq_dicts)):
+            freq_project = freq_dicts[i]
+            ed_project = ed_dicts[i]
+            if i == 0:
+                freq_sum = freq_project
+                ed_sum = ed_project
+            else:
+                for j in range(len(freq_sum)):
+                    freq_sum[j] = {k: freq_project[j].get(k, 0) + freq_sum[j].get(k, 0) for k in set(freq_project[j]) | set(freq_sum[j])}
+                for j, ed in enumerate(ed_dicts):
+                    if j == 0:
+                        ed_sum = ed.copy()
+                    else:
+                        temp_list = []
+                        for key in ed:
+                            temp_list = np.concatenate((ed_sum[key], ed[key]), axis=None)
+                            ed_sum[key] = temp_list
 
 
-            # frame = raw_df['Frame'][idx]
-            # image = get_frame(vid_path, raw_df['Frame'][idx])
-            # name = 'output/'+ after_dir[i] + '/'+ raw_df['Keypoint'][idx] + '.png'
-            # draw_lines(image, after_dataframe.iloc[frame], name)
-            # bname = 'output/'+ after_dir[i] + '/' + raw_df['Keypoint'][idx] + '_b.png'
-            # bimage = get_frame(vid_path, raw_df['Frame'][idx])
-            # draw_lines(bimage, before_dataframe.iloc[frame], bname)
+                    
+                            
+                # for j, key in enumerate(ed_sum):
+                    # ed_sum[j] = {k: ed_project[j].get(k, 0) + ed_sum[j].get(k, 0) for k in set(ed_project[j]) | set(ed_sum[j])}
+        
+        # get images and statistics
+        for i, dict in enumerate(ed_dicts):
+            file_name = after_dir[i] + '_preds_HigherHRNet.csv'
+            before_dataframe = csv_to_df(before_path+file_name)
+            after_dataframe = csv_to_df(after_path+after_dir[i]+'/'+file_name)
+            df, raw_df = euclidean_distance(dict, before_dataframe, after_dataframe, after_dir[i], fps_dict[after_dir[i]])
+            df.to_csv(csv_path+after_dir[i]+'.csv')
+            if not (os.path.exists('/Users/min/minf2/output/' + after_dir[i])):
+                os.makedirs('/Users/min/minf2/output/' + after_dir[i])
+
+            for idx in raw_df.index:
+                vid_path = '/Users/min/Desktop/deepfaked_videos/' + after_dir[i] + '.mp4'
+                outpath = after_dir[i] + '/'
+                max_ed_images(after_dataframe, vid_path, before_dataframe, raw_df, outpath)
+
+
+                # frame = raw_df['Frame'][idx]
+                # image = get_frame(vid_path, raw_df['Frame'][idx])
+                # name = 'output/'+ after_dir[i] + '/'+ raw_df['Keypoint'][idx] + '.png'
+                # draw_lines(image, after_dataframe.iloc[frame], name)
+                # bname = 'output/'+ after_dir[i] + '/' + raw_df['Keypoint'][idx] + '_b.png'
+                # bimage = get_frame(vid_path, raw_df['Frame'][idx])
+                # draw_lines(bimage, before_dataframe.iloc[frame], bname)
+            
+        
+
+        # draw histogram
+        for n, i in enumerate(freq_sum):
+            plt.clf()
+            plt.bar(range(len(i)), list(i.values()), tick_label=list(i.keys()))
+            ax = plt.gca()
+            ax.set_xticks(ax.get_xticks()[::10])
+            plt.xlabel('Euclidean Distance (pixel)')
+            plt.ylabel('Frequency')
+            plt.title(col_names[n])
+            plt.savefig(image_path+col_names[n]+'.png')
         
     
 
-    # draw histogram
-    for n, i in enumerate(freq_sum):
-        plt.clf()
-        plt.bar(range(len(i)), list(i.values()), tick_label=list(i.keys()))
-        ax = plt.gca()
-        ax.set_xticks(ax.get_xticks()[::10])
-        plt.xlabel('Euclidean Distance (pixel)')
-        plt.ylabel('Frequency')
-        plt.title(col_names[n])
-        plt.savefig(image_path+col_names[n]+'.png')
-        
-    
 
-
-
+    b_path = '/Users/min/Downloads/seqs_v4_updatedfeats_vidfiles/20210923_155848.mp4'
+    a_path = '/Users/min/Downloads/deepfaked_videos/20210923_155848.mp4'
+    bimg = '/Users/min/Downloads/b_img.png'
+    aimg = '/Users/min/Downloads/a_img.png'
     # check_integrity(b, a)
     # get_frame(path, frame)
+    bf = get_frame(b_path, 9284)
+    af = get_frame(a_path, 9284)
+
+    cv2.imwrite(bimg, bf)
+    cv2.imwrite(aimg, af)
